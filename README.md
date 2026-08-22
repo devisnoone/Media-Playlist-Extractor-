@@ -12,7 +12,12 @@ files and exports them as a ready-to-play playlist for **PotPlayer**, **VLC**,
 - **Custom extensions** — type any extension not in the list (`iso, srt, rar, ts`)
   and it's matched right alongside the built-in checkboxes
 - **Multiple playlist formats** — export as `.m3u`, `.m3u8`, `.pls`, `.xspf`,
-  `.wpl`, or `.asx`
+  `.wpl`, `.asx`, or plain `.txt`
+- **Copy Links** — scan and copy the matched URLs straight to your clipboard
+  without downloading anything, for pasting into another tool
+- **Smart file naming** — the downloaded playlist is named after the folder
+  you're browsing (e.g. `/Music/MyAlbum/` → `MyAlbum.m3u`), not a generic
+  `playlist.m3u`
 - **One click** — scans the page, builds the playlist, and downloads it
   automatically
 - **No broad permissions** — only requests access to the tab you're currently
@@ -36,11 +41,14 @@ The extension icon will appear in your toolbar.
    index, etc.)
 2. Click the extension icon
 3. Select the file formats you want (or type custom extensions)
-4. Choose a playlist format from the dropdown
-5. Click **Download Playlist**
+4. Either:
+   - Choose a playlist format from the dropdown and click **Download Playlist**, or
+   - Click **Copy Links** to copy the matched URLs to your clipboard without
+     downloading anything
 
-The generated file downloads to your default Downloads folder. Open it with
-PotPlayer, VLC, or your player of choice.
+The generated file downloads to your default Downloads folder, named after
+the current page's folder (e.g. `MyAlbum.m3u`). Open it with PotPlayer, VLC,
+or your player of choice.
 
 ## Supported playlist formats
 
@@ -52,6 +60,7 @@ PotPlayer, VLC, or your player of choice.
 | XSPF   | `.xspf`   | XML Shareable Playlist Format |
 | WPL    | `.wpl`    | Windows Media Player playlist |
 | ASX    | `.asx`    | Advanced Stream Redirector |
+| TXT    | `.txt`    | Plain list, one URL per line — no metadata |
 
 ## How it works
 
@@ -61,9 +70,12 @@ PotPlayer, VLC, or your player of choice.
 - The injected function scans all `<a>` tags on the page, resolves their
   `href` to absolute URLs, and filters by the selected extensions
   (case-insensitive)
-- Matched links are deduplicated and passed back to the popup, which formats
-  them according to the chosen playlist type and triggers a download via
-  `chrome.downloads`
+- Matched links are deduplicated and passed back to the popup, which either:
+  - formats them according to the chosen playlist type and triggers a
+    download via `chrome.downloads`, naming the file after the last folder
+    segment of the page's URL, or
+  - joins them with newlines and writes them to the clipboard via the
+    Clipboard API (with an `execCommand` fallback)
 
 Only `http://` and `https://` pages can be scanned — `chrome://` pages,
 extension pages, and the Chrome Web Store block script injection by design.
@@ -96,6 +108,9 @@ tab you're actively viewing when you click the button.
   scroll) won't be included unless you scroll first
 - Custom extensions are matched literally against the URL path, so a typo
   (`mp4` vs `mp`) will simply return no matches rather than an error
+- The folder-name detection can occasionally misfire on folder names that
+  happen to end in a dot-plus-short-suffix pattern (e.g. `v1.2`), since that
+  looks like a filename extension
 
 ## Contributing
 

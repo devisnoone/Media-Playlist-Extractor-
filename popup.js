@@ -1,5 +1,7 @@
 const downloadBtn   = document.getElementById('downloadBtn');
-const btnText       = downloadBtn.querySelector('.btn-text');
+const downloadText  = downloadBtn.querySelector('.btn-text');
+const copyBtn       = document.getElementById('copyBtn');
+const copyText      = copyBtn.querySelector('.btn-text');
 const statusEl      = document.getElementById('status');
 const formatList    = document.getElementById('formatList');
 const selectAllBtn  = document.getElementById('selectAllBtn');
@@ -94,8 +96,56 @@ const FORMAT_GENERATORS = {
         .join('\n');
       return `<ASX version="3.0">\n  <TITLE>Playlist</TITLE>\n${entries}\n</ASX>\n`;
     }
+  },
+  txt: {
+    ext: 'txt',
+    mime: 'text/plain',
+    generate(links) {
+      return links.join('\n') + '\n';
+    }
   }
 };
+
+/* ---------------------------------------------------------
+ * Filename derived from the current page's folder
+ * --------------------------------------------------------- */
+function sanitizeFileName(name) {
+  const cleaned = String(name)
+    .replace(/[\\/:*?"<>|]+/g, '_')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 80);
+  return cleaned || 'playlist';
+}
+
+function getPlaylistBaseName(tabUrl) {
+  try {
+    const u = new URL(tabUrl);
+    const segments = u.pathname.split('/').filter(Boolean);
+
+    if (segments.length === 0) {
+      return sanitizeFileName(u.hostname || 'playlist');
+    }
+
+    let last = segments[segments.length - 1];
+
+    // If the last path segment looks like a filename (has a short extension,
+    // e.g. "index.html"), use its parent folder instead — that's usually
+    // the actual album/directory name the user is browsing.
+    const looksLikeFile = /\.[a-z0-9]{1,5}$/i.test(last);
+    if (looksLikeFile) {
+      if (segments.length > 1) {
+        last = segments[segments.length - 2];
+      } else {
+        return sanitizeFileName(u.hostname || 'playlist');
+      }
+    }
+
+    return sanitizeFileName(decodeURIComponent(last));
+  } catch (e) {
+    return 'playlist';
+  }
+}
 
 /* ---------------------------------------------------------
  * UI helpers
@@ -110,10 +160,9 @@ function setStatus(message, type) {
   if (type === 'error') statusEl.classList.add('shake');
 }
 
-function setLoading(isLoading) {
-  downloadBtn.disabled = isLoading;
-  downloadBtn.classList.toggle('loading', isLoading);
-  btnText.textContent = isLoading ? 'Scanning…' : 'Download Playlist';
+function setBusy(button, isBusy) {
+  button.disabled = isBusy;
+  button.classList.toggle('loading', isBusy);
 }
 
 function getCheckboxes() {
@@ -169,8 +218,65 @@ function scanPageForMediaLinks(extensions) {
   return Array.from(new Set(matches));
 }
 
+/**
+ * Shared scan step used by both the download and copy actions.
+ * Queries the active tab, validates it, injects the scanner, and
+ * returns { links, tabUrl }. Throws an Error with a user-facing
+ * message on any failure.
+ */
+async function getMatchedLinksFromActiveTab(selectedExtensions) {
+  const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+
+  if (!activeTab || !activeTab.id) {
+    throw new Error('No active tab found.');
+  }
+
+  if (!/^https?:\/\//i.test(activeTab.url || '')) {
+    throw new Error("This page can't be scanned (only http/https pages are supported).");
+  }
+
+  const injectionResults = await chrome.scripting.executeScript({
+    target: { tabId: activeTab.id },
+    func: scanPageForMediaLinks,
+    args: [selectedExtensions]
+  });
+
+  const links = injectionResults?.[0]?.result || [];
+  return { links, tabUrl: activeTab.url };
+}
+
+/**
+ * Copies text to the clipboard, falling back to a hidden textarea +
+ * execCommand if the async Clipboard API isn't available/permitted.
+ */
+async function copyTextToClipboard(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch (e) {
+      // fall through to the fallback below
+    }
+  }
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  document.body.appendChild(textarea);
+  textarea.focus();
+  textarea.select();
+  let success = false;
+  try {
+    success = document.execCommand('copy');
+  } catch (e) {
+    success = false;
+  }
+  document.body.removeChild(textarea);
+  return success;
+}
+
 /* ---------------------------------------------------------
- * Main action
+ * Download Playlist
  * --------------------------------------------------------- */
 downloadBtn.addEventListener('click', async () => {
   const selectedExtensions = getSelectedExtensions();
@@ -183,29 +289,12 @@ downloadBtn.addEventListener('click', async () => {
   const formatKey = playlistFormatSelect.value;
   const formatDef = FORMAT_GENERATORS[formatKey];
 
-  setLoading(true);
+  setBusy(downloadBtn, true);
+  downloadText.textContent = 'Scanning…';
   setStatus('Scanning page…');
 
   try {
-    const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
-
-    if (!activeTab || !activeTab.id) {
-      setStatus('No active tab found.', 'error');
-      return;
-    }
-
-    if (!/^https?:\/\//i.test(activeTab.url || '')) {
-      setStatus("This page can't be scanned (only http/https pages are supported).", 'error');
-      return;
-    }
-
-    const injectionResults = await chrome.scripting.executeScript({
-      target: { tabId: activeTab.id },
-      func: scanPageForMediaLinks,
-      args: [selectedExtensions]
-    });
-
-    const links = injectionResults?.[0]?.result || [];
+    const { links, tabUrl } = await getMatchedLinksFromActiveTab(selectedExtensions);
 
     if (links.length === 0) {
       setStatus('No links found for the selected formats.', 'error');
@@ -215,7 +304,8 @@ downloadBtn.addEventListener('click', async () => {
     const content = formatDef.generate(links);
     const blob = new Blob([content], { type: formatDef.mime });
     const blobUrl = URL.createObjectURL(blob);
-    const filename = `playlist.${formatDef.ext}`;
+    const baseName = getPlaylistBaseName(tabUrl);
+    const filename = `${baseName}.${formatDef.ext}`;
 
     chrome.downloads.download(
       { url: blobUrl, filename, saveAs: false },
@@ -235,8 +325,62 @@ downloadBtn.addEventListener('click', async () => {
       }
     );
   } catch (err) {
-    setStatus('Error: ' + (err?.message || String(err)), 'error');
+    setStatus(err?.message || String(err), 'error');
   } finally {
-    setLoading(false);
+    setBusy(downloadBtn, false);
+    downloadText.textContent = 'Download Playlist';
+  }
+});
+
+/* ---------------------------------------------------------
+ * Copy Links (no download)
+ * --------------------------------------------------------- */
+copyBtn.addEventListener('click', async () => {
+  const selectedExtensions = getSelectedExtensions();
+
+  if (selectedExtensions.length === 0) {
+    setStatus('Please select a format or enter a custom extension.', 'error');
+    return;
+  }
+
+  setBusy(copyBtn, true);
+  copyText.textContent = 'Scanning…';
+  setStatus('Scanning page…');
+
+  let justCopied = false;
+
+  try {
+    const { links } = await getMatchedLinksFromActiveTab(selectedExtensions);
+
+    if (links.length === 0) {
+      setStatus('No links found for the selected formats.', 'error');
+      return;
+    }
+
+    const copied = await copyTextToClipboard(links.join('\n'));
+
+    if (copied) {
+      justCopied = true;
+      setStatus(
+        `Copied ${links.length} link${links.length === 1 ? '' : 's'} to clipboard!`,
+        'success'
+      );
+    } else {
+      setStatus('Could not copy to clipboard — try again.', 'error');
+    }
+  } catch (err) {
+    setStatus(err?.message || String(err), 'error');
+  } finally {
+    setBusy(copyBtn, false);
+    if (justCopied) {
+      copyBtn.classList.add('copied');
+      copyText.textContent = 'Copied!';
+      setTimeout(() => {
+        copyBtn.classList.remove('copied');
+        copyText.textContent = 'Copy Links';
+      }, 1500);
+    } else {
+      copyText.textContent = 'Copy Links';
+    }
   }
 });

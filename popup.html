@@ -183,13 +183,16 @@
     transform: translateY(-1px);
   }
 
-  /* --- Download button --- */
-  #downloadBtn {
-    width: 100%;
-    padding: 9px 10px;
-    background: var(--accent);
-    color: #fff;
-    border: none;
+  /* --- Buttons --- */
+  .btn-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 2px;
+  }
+
+  .btn-row button {
+    flex: 1;
+    padding: 9px 8px;
     border-radius: 7px;
     font-size: 13px;
     font-weight: 600;
@@ -197,8 +200,14 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
-    transition: background-color .15s ease, transform .1s ease, box-shadow .15s ease;
+    gap: 7px;
+    transition: background-color .15s ease, border-color .15s ease, color .15s ease, transform .1s ease, box-shadow .15s ease;
+  }
+
+  #downloadBtn {
+    background: var(--accent);
+    color: #fff;
+    border: none;
   }
 
   #downloadBtn:hover:not(:disabled) {
@@ -218,6 +227,34 @@
     transform: none;
   }
 
+  #copyBtn {
+    background: #fff;
+    color: var(--accent);
+    border: 1.5px solid var(--accent);
+  }
+
+  #copyBtn:hover:not(:disabled) {
+    background: #eff4ff;
+    transform: translateY(-1px);
+  }
+
+  #copyBtn:active:not(:disabled) {
+    transform: translateY(0) scale(.98);
+  }
+
+  #copyBtn:disabled {
+    border-color: #c7cdd6;
+    color: #9ca3af;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  #copyBtn.copied {
+    background: #e8f5e9;
+    border-color: #2e7d32;
+    color: #1b5e20;
+  }
+
   .spinner {
     width: 13px;
     height: 13px;
@@ -228,7 +265,12 @@
     animation: spin .6s linear infinite;
   }
 
-  #downloadBtn.loading .spinner { display: inline-block; }
+  .spinner-dark {
+    border: 2px solid rgba(37, 99, 235, .25);
+    border-top-color: var(--accent);
+  }
+
+  .btn-row button.loading .spinner { display: inline-block; }
 
   @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -303,15 +345,22 @@
       <option value="xspf">XSPF (XML)</option>
       <option value="wpl">WPL (Windows Media Player)</option>
       <option value="asx">ASX</option>
+      <option value="txt">TXT (plain list)</option>
     </select>
   </div>
 
-  <button id="downloadBtn">
-    <span class="spinner"></span>
-    <span class="btn-text">Download Playlist</span>
-  </button>
+  <div class="btn-row">
+    <button id="copyBtn">
+      <span class="spinner spinner-dark"></span>
+      <span class="btn-text">Copy Links</span>
+    </button>
+    <button id="downloadBtn">
+      <span class="spinner"></span>
+      <span class="btn-text">Download Playlist</span>
+    </button>
+  </div>
 
-  <div id="status">Select formats and click "Download Playlist".</div>
+  <div id="status">Select formats and click "Download Playlist" or "Copy Links".</div>
 
   <script src="popup.js"></script>
 </body>
