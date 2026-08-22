@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Media Playlist Extractor</title>
+<style>
+  :root {
+    --accent: #2563eb;
+    --accent-dark: #1d4ed8;
+    --bg-soft: #f6f7f9;
+    --border: #dde1e7;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    width: 280px;
+    margin: 0;
+    padding: 14px;
+    color: #1f2328;
+    animation: fadeInUp .28s ease both;
+  }
+
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  h1 {
+    font-size: 14px;
+    margin: 0 0 10px 0;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  h1 .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--accent);
+    display: inline-block;
+    animation: pulseDot 1.8s ease-in-out infinite;
+  }
+
+  @keyframes pulseDot {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50%      { transform: scale(1.4); opacity: .55; }
+  }
+
+  .section-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+    color: #6b7280;
+    margin: 10px 0 6px 0;
+  }
+
+  /* --- Animated checkboxes ("chips") --- */
+  .formats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2px 6px;
+    padding: 6px;
+    background: var(--bg-soft);
+    border-radius: 8px;
+  }
+
+  .chip {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 13px;
+    cursor: pointer;
+    user-select: none;
+    padding: 5px 6px;
+    border-radius: 6px;
+    transition: background-color .15s ease;
+  }
+
+  .chip:hover { background-color: #eaeef3; }
+
+  .chip input[type="checkbox"] {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+
+  .chip-box {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    border: 2px solid #c7cdd6;
+    border-radius: 4px;
+    position: relative;
+    transition: border-color .18s ease, background-color .18s ease, transform .15s ease;
+  }
+
+  .chip-box::after {
+    content: "";
+    position: absolute;
+    left: 4px;
+    top: 0px;
+    width: 4px;
+    height: 8px;
+    border: solid #fff;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg) scale(0);
+    transition: transform .2s cubic-bezier(.34, 1.56, .64, 1);
+  }
+
+  .chip input:checked ~ .chip-box {
+    background: var(--accent);
+    border-color: var(--accent);
+    transform: scale(1.05);
+  }
+
+  .chip input:checked ~ .chip-box::after {
+    transform: rotate(45deg) scale(1);
+  }
+
+  .chip input:focus-visible ~ .chip-box {
+    outline: 2px solid #93c5fd;
+    outline-offset: 1px;
+  }
+
+  /* --- Text field / select --- */
+  .field { margin-bottom: 8px; }
+
+  .field label {
+    display: block;
+    font-size: 12px;
+    color: #4b5563;
+    margin-bottom: 4px;
+  }
+
+  .field .hint { color: #9ca3af; font-weight: 400; }
+
+  .field input[type="text"],
+  .field select {
+    width: 100%;
+    padding: 7px 8px;
+    font-size: 13px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: #fff;
+    color: #1f2328;
+    transition: border-color .15s ease, box-shadow .15s ease;
+    font-family: inherit;
+  }
+
+  .field input[type="text"]:focus,
+  .field select:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, .15);
+  }
+
+  /* --- Action links --- */
+  .actions {
+    display: flex;
+    gap: 10px;
+    margin: 8px 0 10px 0;
+  }
+
+  .actions button.link-style {
+    background: none;
+    border: none;
+    color: var(--accent);
+    font-size: 12px;
+    cursor: pointer;
+    padding: 0;
+    transition: color .15s ease, transform .15s ease;
+  }
+
+  .actions button.link-style:hover {
+    color: var(--accent-dark);
+    transform: translateY(-1px);
+  }
+
+  /* --- Download button --- */
+  #downloadBtn {
+    width: 100%;
+    padding: 9px 10px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 7px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: background-color .15s ease, transform .1s ease, box-shadow .15s ease;
+  }
+
+  #downloadBtn:hover:not(:disabled) {
+    background: var(--accent-dark);
+    box-shadow: 0 4px 10px rgba(37, 99, 235, .3);
+    transform: translateY(-1px);
+  }
+
+  #downloadBtn:active:not(:disabled) {
+    transform: translateY(0) scale(.98);
+  }
+
+  #downloadBtn:disabled {
+    background: #9ca3af;
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
+  }
+
+  .spinner {
+    width: 13px;
+    height: 13px;
+    border: 2px solid rgba(255, 255, 255, .4);
+    border-top-color: #fff;
+    border-radius: 50%;
+    display: none;
+    animation: spin .6s linear infinite;
+  }
+
+  #downloadBtn.loading .spinner { display: inline-block; }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* --- Status area --- */
+  #status {
+    margin-top: 10px;
+    min-height: 30px;
+    font-size: 12px;
+    line-height: 1.4;
+    padding: 8px 9px;
+    border-radius: 6px;
+    background: var(--bg-soft);
+    color: #444;
+    white-space: pre-wrap;
+    word-break: break-word;
+    transition: background-color .2s ease, color .2s ease;
+  }
+
+  #status.show { animation: statusIn .25s ease; }
+
+  @keyframes statusIn {
+    from { opacity: 0; transform: translateY(-3px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  #status.shake { animation: shake .4s ease; }
+
+  @keyframes shake {
+    10%, 90% { transform: translateX(-1px); }
+    20%, 80% { transform: translateX(2px); }
+    30%, 50%, 70% { transform: translateX(-4px); }
+    40%, 60% { transform: translateX(4px); }
+  }
+
+  #status.error   { background: #fdecea; color: #b3261e; }
+  #status.success { background: #e8f5e9; color: #1b5e20; }
+</style>
+</head>
+<body>
+  <h1><span class="dot"></span>Extract Media Playlist</h1>
+
+  <div class="section-label">File formats</div>
+  <div class="formats" id="formatList">
+    <label class="chip"><input type="checkbox" value="flac" checked><span class="chip-box"></span>FLAC</label>
+    <label class="chip"><input type="checkbox" value="mp3" checked><span class="chip-box"></span>MP3</label>
+    <label class="chip"><input type="checkbox" value="mp4" checked><span class="chip-box"></span>MP4</label>
+    <label class="chip"><input type="checkbox" value="mkv" checked><span class="chip-box"></span>MKV</label>
+    <label class="chip"><input type="checkbox" value="avi" checked><span class="chip-box"></span>AVI</label>
+    <label class="chip"><input type="checkbox" value="wav"><span class="chip-box"></span>WAV</label>
+    <label class="chip"><input type="checkbox" value="m4a"><span class="chip-box"></span>M4A</label>
+    <label class="chip"><input type="checkbox" value="webm"><span class="chip-box"></span>WEBM</label>
+    <label class="chip"><input type="checkbox" value="mov"><span class="chip-box"></span>MOV</label>
+    <label class="chip"><input type="checkbox" value="ogg"><span class="chip-box"></span>OGG</label>
+  </div>
+
+  <div class="actions">
+    <button type="button" class="link-style" id="selectAllBtn">Select all</button>
+    <button type="button" class="link-style" id="selectNoneBtn">Clear</button>
+  </div>
+
+  <div class="field">
+    <label for="customExt">Custom extensions <span class="hint">(comma-separated)</span></label>
+    <input type="text" id="customExt" placeholder="e.g. iso, srt, rar, ts">
+  </div>
+
+  <div class="field">
+    <label for="playlistFormat">Playlist format</label>
+    <select id="playlistFormat">
+      <option value="m3u" selected>M3U</option>
+      <option value="m3u8">M3U8</option>
+      <option value="pls">PLS</option>
+      <option value="xspf">XSPF (XML)</option>
+      <option value="wpl">WPL (Windows Media Player)</option>
+      <option value="asx">ASX</option>
+    </select>
+  </div>
+
+  <button id="downloadBtn">
+    <span class="spinner"></span>
+    <span class="btn-text">Download Playlist</span>
+  </button>
+
+  <div id="status">Select formats and click "Download Playlist".</div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

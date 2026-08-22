@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "Media Playlist Extractor",
+  "version": "1.1.0",
+  "description": "Scans the active page for media file links and exports them as a playlist (M3U, M3U8, PLS, XSPF, WPL, ASX).",
+  "permissions": ["activeTab", "scripting", "downloads"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Extract Media Playlist"
+  }
+}
